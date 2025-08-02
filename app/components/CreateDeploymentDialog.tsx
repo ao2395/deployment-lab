@@ -167,7 +167,13 @@ export function CreateDeploymentDialog({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={addEnvVar}
+                  onClick={() => {
+                    console.log('Add button clicked!')
+                    console.log('newEnvKey:', newEnvKey)
+                    console.log('newEnvValue:', newEnvValue)
+                    console.log('Button disabled?', !newEnvKey || !newEnvValue)
+                    addEnvVar()
+                  }}
                   disabled={!newEnvKey || !newEnvValue}
                 >
                   <Plus className="h-4 w-4" />

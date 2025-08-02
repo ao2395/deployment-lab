@@ -128,11 +128,11 @@ cd /app && node server.js' > /app/start.sh && \\
 # Set environment variables
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT={port}
+ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # Expose port
-EXPOSE {port}
+EXPOSE 3000
 
 # Start both services
 CMD ["/app/start.sh"]
