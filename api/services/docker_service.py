@@ -238,7 +238,7 @@ CMD ["nginx", "-g", "daemon off;"]
             container_name = f"{deployment.name}-{deployment.id}"
             
             env_vars = deployment.env_vars.copy()
-            env_vars["PORT"] = str(deployment.port)
+            # Don't set PORT - let it use the hardcoded PORT=3000 from Dockerfile
             
             # Debug: Log environment variables being passed to container
             await self.log_build(deployment.id, f"Environment variables for container: {list(env_vars.keys())}")
