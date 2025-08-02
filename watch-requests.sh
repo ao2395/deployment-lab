@@ -3,6 +3,10 @@
 # Deployment Lab Request Monitor
 # Shows all HTTP requests in real-time
 
+# Kill any existing watch processes to prevent duplicates
+pkill -f "tail.*logs/.*log" 2>/dev/null || true
+sleep 1
+
 echo "🔍 Deployment Lab Request Monitor"
 echo "================================="
 echo "Monitoring all HTTP requests..."
