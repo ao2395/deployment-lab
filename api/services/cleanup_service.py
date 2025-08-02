@@ -25,13 +25,30 @@ class CleanupService:
         try:
             db = get_database()
             
-            # Get deployment info
-            deployment_doc = await db.deployments.find_one({"_id": deployment_id})
+            # Get deployment info  
+            from bson import ObjectId
+            try:
+                deployment_doc = await db.deployments.find_one({"_id": ObjectId(deployment_id)})
+            except Exception:
+                deployment_doc = None
             if not deployment_doc:
                 print(f"Deployment {deployment_id} not found")
                 return False
             
-            deployment = DeploymentModel(**deployment_doc)
+            # Create a simple deployment object instead of using Pydantic model
+            class SimpleDeployment:
+                def __init__(self, doc):
+                    self.id = str(doc["_id"])
+                    self.name = doc["name"]
+                    self.github_url = doc["github_url"]
+                    self.subdomain = doc["subdomain"]
+                    self.port = doc["port"]
+                    self.status = doc["status"]
+                    self.container_id = doc.get("container_id")
+                    self.docker_image = doc.get("docker_image")
+                    self.env_vars = doc.get("env_vars", {})
+            
+            deployment = SimpleDeployment(deployment_doc)
             
             await self.log_cleanup(deployment_id, f"Starting cleanup for deployment: {deployment.name}")
             
@@ -110,7 +127,7 @@ class CleanupService:
             
             # 6. Remove from database (keep logs for reference)
             await self.log_cleanup(deployment_id, "Removing deployment from database...")
-            delete_result = await db.deployments.delete_one({"_id": deployment_id})
+            delete_result = await db.deployments.delete_one({"_id": ObjectId(deployment_id)})
             if delete_result.deleted_count > 0:
                 await self.log_cleanup(deployment_id, "Deployment removed from database successfully")
             else:
@@ -136,11 +153,28 @@ class CleanupService:
         try:
             db = get_database()
             
-            deployment_doc = await db.deployments.find_one({"_id": deployment_id})
+            from bson import ObjectId
+            try:
+                deployment_doc = await db.deployments.find_one({"_id": ObjectId(deployment_id)})
+            except Exception:
+                deployment_doc = None
             if not deployment_doc:
                 return True
             
-            deployment = DeploymentModel(**deployment_doc)
+            # Create a simple deployment object instead of using Pydantic model
+            class SimpleDeployment:
+                def __init__(self, doc):
+                    self.id = str(doc["_id"])
+                    self.name = doc["name"]
+                    self.github_url = doc["github_url"]
+                    self.subdomain = doc["subdomain"]
+                    self.port = doc["port"]
+                    self.status = doc["status"]
+                    self.container_id = doc.get("container_id")
+                    self.docker_image = doc.get("docker_image")
+                    self.env_vars = doc.get("env_vars", {})
+            
+            deployment = SimpleDeployment(deployment_doc)
             
             await self.log_cleanup(deployment_id, "Starting cleanup for failed deployment...")
             
@@ -158,7 +192,7 @@ class CleanupService:
             await self.port_service.release_port(deployment.port)
             
             # Remove from database
-            await db.deployments.delete_one({"_id": deployment_id})
+            await db.deployments.delete_one({"_id": ObjectId(deployment_id)})
             
             await self.log_cleanup(deployment_id, "Failed deployment cleanup completed")
             return True

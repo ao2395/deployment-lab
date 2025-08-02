@@ -212,6 +212,9 @@ CMD ["nginx", "-g", "daemon off;"]
         try:
             await self.log_build(deployment.id, f"Starting container from image: {image_tag}")
             
+            # Clean up any orphaned containers using this port first
+            await self.cleanup_orphaned_containers_on_port(deployment.port)
+            
             container_name = f"{deployment.name}-{deployment.id}"
             
             env_vars = deployment.env_vars.copy()
@@ -273,6 +276,30 @@ CMD ["nginx", "-g", "daemon off;"]
         except Exception as e:
             print(f"Failed to cleanup build files: {e}")
     
+    async def cleanup_orphaned_containers_on_port(self, port: int):
+        """Clean up any containers that might be using the specified port"""
+        try:
+            loop = asyncio.get_event_loop()
+            containers = await loop.run_in_executor(None, self.client.containers.list, {"all": True})
+            
+            for container in containers:
+                # Check if container is using the port
+                if hasattr(container, 'ports') and container.ports:
+                    for container_port, host_bindings in container.ports.items():
+                        if host_bindings:
+                            for binding in host_bindings:
+                                if binding.get('HostPort') == str(port):
+                                    print(f"Found orphaned container {container.id} using port {port}, removing...")
+                                    try:
+                                        await loop.run_in_executor(None, container.stop)
+                                        await loop.run_in_executor(None, container.remove)
+                                        print(f"Removed orphaned container {container.id}")
+                                    except Exception as e:
+                                        print(f"Failed to remove orphaned container {container.id}: {e}")
+                                    
+        except Exception as e:
+            print(f"Failed to cleanup orphaned containers on port {port}: {e}")
+    
     async def deploy_from_github(self, deployment: DeploymentModel) -> bool:
         try:
             await self.update_deployment_status(deployment.id, DeploymentStatus.BUILDING)
@@ -290,6 +317,8 @@ CMD ["nginx", "-g", "daemon off;"]
             
             container_id = await self.run_container(image_tag, deployment)
             if not container_id:
+                # Clean up the Docker image since container failed to start
+                await self.remove_image(image_tag)
                 await self.cleanup_build_files(repo_path)
                 await self.update_deployment_status(deployment.id, DeploymentStatus.FAILED)
                 return False
