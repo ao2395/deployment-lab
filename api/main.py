@@ -32,14 +32,11 @@ app = FastAPI(
 async def log_requests(request: Request, call_next):
     start_time = time.time()
     
-    # Log incoming request
-    logger.info(f"🔥 {request.method} {request.url} - Headers: {dict(request.headers)}")
-    
     response = await call_next(request)
     
-    # Log response
+    # Simple log: METHOD URL -> STATUS (TIME)
     process_time = time.time() - start_time
-    logger.info(f"✅ {request.method} {request.url} - Status: {response.status_code} - Time: {process_time:.4f}s")
+    logger.info(f"{request.method} {request.url.path} -> {response.status_code} ({process_time:.3f}s)")
     
     return response
 

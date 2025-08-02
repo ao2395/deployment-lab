@@ -18,9 +18,9 @@ colorize() {
 
 # Start monitoring multiple log sources simultaneously
 {
-    # Monitor backend access logs
-    tail -f logs/backend.log | grep -E "(GET|POST|PUT|DELETE|PATCH)" --line-buffered | while read line; do
-        colorize "32" "[BACKEND] $line"
+    # Monitor backend access logs (simple format)
+    tail -f logs/backend.log | grep -E "(GET|POST|PUT|DELETE|PATCH)" --line-buffered | grep -v "Headers" | while read line; do
+        colorize "32" "[API] $line"
     done &
     
     # Monitor nginx access logs (if they exist)
