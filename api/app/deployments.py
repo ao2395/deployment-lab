@@ -35,8 +35,15 @@ class LogResponse(BaseModel):
 async def deploy_application(deployment_id: str):
     """Background task to handle deployment process"""
     try:
+        from bson import ObjectId
         db = get_database()
-        deployment_doc = await db.deployments.find_one({"_id": deployment_id})
+        
+        # Convert string ID to ObjectId for MongoDB query
+        try:
+            deployment_doc = await db.deployments.find_one({"_id": ObjectId(deployment_id)})
+        except Exception:
+            deployment_doc = None
+            
         if not deployment_doc:
             return
         
@@ -210,8 +217,14 @@ async def get_deployment(
     deployment_id: str,
     current_user: User = Depends(get_current_user)
 ):
+    from bson import ObjectId
     db = get_database()
-    deployment = await db.deployments.find_one({"_id": deployment_id})
+    
+    # Convert string ID to ObjectId for MongoDB query
+    try:
+        deployment = await db.deployments.find_one({"_id": ObjectId(deployment_id)})
+    except Exception:
+        deployment = None
     
     if not deployment:
         raise HTTPException(
@@ -236,8 +249,14 @@ async def delete_deployment(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user)
 ):
+    from bson import ObjectId
     db = get_database()
-    deployment = await db.deployments.find_one({"_id": deployment_id})
+    
+    # Convert string ID to ObjectId for MongoDB query
+    try:
+        deployment = await db.deployments.find_one({"_id": ObjectId(deployment_id)})
+    except Exception:
+        deployment = None
     
     if not deployment:
         raise HTTPException(
@@ -255,10 +274,14 @@ async def get_deployment_logs(
     deployment_id: str,
     current_user: User = Depends(get_current_user)
 ):
+    from bson import ObjectId
     db = get_database()
     
     # Check if deployment exists
-    deployment = await db.deployments.find_one({"_id": deployment_id})
+    try:
+        deployment = await db.deployments.find_one({"_id": ObjectId(deployment_id)})
+    except Exception:
+        deployment = None
     if not deployment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -285,8 +308,14 @@ async def get_deployment_status(
     deployment_id: str,
     current_user: User = Depends(get_current_user)
 ):
+    from bson import ObjectId
     db = get_database()
-    deployment = await db.deployments.find_one({"_id": deployment_id})
+    
+    # Convert string ID to ObjectId for MongoDB query
+    try:
+        deployment = await db.deployments.find_one({"_id": ObjectId(deployment_id)})
+    except Exception:
+        deployment = None
     
     if not deployment:
         raise HTTPException(
