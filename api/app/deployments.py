@@ -47,19 +47,29 @@ async def deploy_application(deployment_id: str):
         if not deployment_doc:
             return
         
-        # Convert ObjectId to string for Pydantic compatibility
-        deployment_doc["_id"] = str(deployment_doc["_id"])
-        deployment = DeploymentModel(**deployment_doc)
+        # Create a simple deployment object instead of using Pydantic model
+        deployment_id_str = str(deployment_doc["_id"])
+        class SimpleDeployment:
+            def __init__(self, doc):
+                self.id = deployment_id_str
+                self.name = doc["name"]
+                self.github_url = doc["github_url"]
+                self.subdomain = doc["subdomain"]
+                self.port = doc["port"]
+                self.status = doc["status"]
+                self.env_vars = doc.get("env_vars", {})
+        
+        deployment = SimpleDeployment(deployment_doc)
         
         # Initialize services with error logging
         try:
             docker_service = DockerService()
-            await docker_service.log_build(deployment_id, "Docker service initialized successfully")
+            await docker_service.log_build(deployment_id_str, "Docker service initialized successfully")
         except Exception as e:
             # Log error directly to database since docker_service failed to initialize
             from models import BuildLogModel, LogLevel
             log_entry = BuildLogModel(
-                deployment_id=deployment_id,
+                deployment_id=deployment_id_str,
                 message=f"Failed to initialize Docker service: {str(e)}",
                 log_level=LogLevel.ERROR
             )
@@ -123,7 +133,7 @@ async def deploy_application(deployment_id: str):
             
             # Update deployment status to failed
             await db.deployments.update_one(
-                {"_id": deployment_id},
+                {"_id": ObjectId(deployment_id)},
                 {"$set": {"status": "failed"}}
             )
         except Exception as log_error:
