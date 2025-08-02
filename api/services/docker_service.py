@@ -131,13 +131,28 @@ CMD ["/app/start.sh"]
         dockerfiles = {
             "nextjs-fastapi": nextjs_fastapi_dockerfile,
             "node": f"""
-FROM node:18-alpine
+FROM node:20-alpine AS base
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+
+# Install dependencies
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# Build the application
 COPY . .
-RUN npm run build || echo "No build script found"
+RUN npm run build
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT={port}
+ENV HOSTNAME="0.0.0.0"
+
+# Expose port
 EXPOSE {port}
+
+# Start the application
 CMD ["npm", "start"]
             """,
             "python": f"""
@@ -157,10 +172,11 @@ CMD ["nginx", "-g", "daemon off;"]
             """
         }
         
-        # Default to Next.js + FastAPI if both frontend and backend detected
+        # Check if it's a Next.js + FastAPI project (both frontend and backend)
         if project_type == "nextjs-fastapi" or (
             os.path.exists(os.path.join(repo_path, "package.json")) and 
-            os.path.exists(os.path.join(repo_path, "api"))
+            os.path.exists(os.path.join(repo_path, "api")) and
+            os.path.exists(os.path.join(repo_path, "api", "main.py"))
         ):
             return nextjs_fastapi_dockerfile.strip()
         
@@ -220,6 +236,13 @@ CMD ["nginx", "-g", "daemon off;"]
             
             env_vars = deployment.env_vars.copy()
             env_vars["PORT"] = str(deployment.port)
+            
+            # Debug: Log environment variables being passed to container
+            await self.log_build(deployment.id, f"Environment variables for container: {list(env_vars.keys())}")
+            for key, value in env_vars.items():
+                # Log keys but mask sensitive values
+                masked_value = value[:4] + "***" if len(value) > 4 else "***"
+                await self.log_build(deployment.id, f"  {key}={masked_value}")
             
             loop = asyncio.get_event_loop()
             container = await loop.run_in_executor(
