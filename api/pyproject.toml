@@ -22,7 +22,8 @@ dependencies = [
     "cloudflare",
     "gitpython",
     "jinja2",
-    "python-dotenv"
+    "python-dotenv",
+    "pyyaml (>=6.0.2,<7.0.0)"
 ]
 
 [tool.poetry]
