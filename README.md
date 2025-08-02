@@ -1,36 +1,168 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Auto-Deployment Platform
 
-## Getting Started
+A comprehensive platform for automatically deploying Next.js + FastAPI applications from GitHub repositories with complete infrastructure management.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Automatic Deployment**: Deploy applications directly from GitHub repositories
+- **Multi-Stack Support**: Optimized for Next.js + FastAPI projects
+- **Infrastructure Management**: Automatic Docker, Nginx, and Cloudflare configuration
+- **Port Management**: Automatic port allocation starting from 3001
+- **Complete Cleanup**: Full resource cleanup when deleting deployments
+- **Real-time Logs**: Monitor build and deployment progress
+- **Secure Authentication**: JWT-based admin-only access
+
+## Architecture
+
+- **Frontend**: Next.js 15 with TypeScript and Tailwind CSS
+- **Backend**: FastAPI with async/await support
+- **Database**: MongoDB for deployment metadata
+- **Containerization**: Docker for application isolation
+- **Reverse Proxy**: Nginx for routing
+- **DNS**: Cloudflare for domain management
+- **Authentication**: JWT tokens with hardcoded admin credentials
+
+## How to Run on Host System
+
+### Prerequisites
+
+1. **System Requirements**:
+   - Ubuntu/Debian Linux server
+   - Docker Engine installed and running
+   - Nginx installed
+   - MongoDB installed and running
+   - Node.js 20+ and Python 3.11+
+   - Cloudflare account (optional)
+
+2. **Permissions**:
+   ```bash
+   # Add your user to docker group
+   sudo usermod -aG docker $USER
+   
+   # Create nginx directories if they don't exist
+   sudo mkdir -p /etc/nginx/sites-available
+   sudo mkdir -p /etc/nginx/sites-enabled
+   
+   # Allow user to modify nginx configs (or run with sudo)
+   sudo chown -R $USER:$USER /etc/nginx/sites-available
+   sudo chown -R $USER:$USER /etc/nginx/sites-enabled
+   ```
+
+### Installation Steps
+
+1. **Clone and Setup**:
+   ```bash
+   git clone <this-repo>
+   cd deployment-lab
+   ```
+
+2. **Configure Environment**:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your actual values
+   nano .env
+   ```
+
+3. **Install Backend Dependencies**:
+   ```bash
+   cd api
+   pip install poetry
+   poetry install
+   cd ..
+   ```
+
+4. **Install Frontend Dependencies**:
+   ```bash
+   npm install
+   ```
+
+5. **Start MongoDB**:
+   ```bash
+   sudo systemctl start mongod
+   sudo systemctl enable mongod
+   ```
+
+6. **Build Frontend**:
+   ```bash
+   npm run build
+   ```
+
+### Running the Application
+
+1. **Start the Backend** (in one terminal):
+   ```bash
+   cd api
+   poetry run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+
+2. **Start the Frontend** (in another terminal):
+   ```bash
+   npm start
+   # This will run on port 3000
+   ```
+
+3. **Access the Application**:
+   - Open browser to `http://your-server-ip:3000`
+   - Login with credentials from your `.env` file
+
+### Environment Configuration
+
+Key variables in `.env`:
+
+```env
+# Database
+MONGODB_URL=mongodb://localhost:27017
+DATABASE_NAME=deployment_lab
+
+# Authentication
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=your-secure-password
+SECRET_KEY=your-secret-key-here
+
+# Cloudflare (optional)
+CLOUDFLARE_API_TOKEN=your-cloudflare-token
+CLOUDFLARE_ZONE_ID=your-zone-id
+CLOUDFLARE_TUNNEL_ID=your-tunnel-id
+BASE_DOMAIN=yourdomain.com
+
+# Port Range (starts from 3001 since 3000 is used by this app)
+MIN_PORT=3001
+MAX_PORT=8000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Deployment Workflow
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **Create Deployment**:
+   - Enter GitHub repository URL
+   - Choose subdomain
+   - Add environment variables (optional)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+2. **Automatic Process**:
+   - Clones GitHub repository
+   - Detects project type (Next.js + FastAPI)
+   - Generates appropriate Dockerfile
+   - Builds Docker image
+   - Creates and starts container
+   - Configures Nginx reverse proxy
+   - Sets up Cloudflare DNS (if configured)
+   - Updates port registry
 
-## Learn More
+3. **Access Deployed App**:
+   - `https://subdomain.yourdomain.com` (if Cloudflare configured)
+   - `http://your-server-ip:assigned-port` (direct access)
 
-To learn more about Next.js, take a look at the following resources:
+### Management Features
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Real-time Monitoring**: View build logs and deployment status
+- **Easy Cleanup**: Delete deployments with complete resource cleanup
+- **Port Management**: Automatic allocation and deallocation
+- **Multi-project Support**: Handle multiple deployments simultaneously
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Security Notes
 
-## Deploy on Vercel
+- **Run on host system** - Don't containerize this management app
+- **Admin-only access** - No user registration, secure credentials
+- **Container isolation** - Each deployment runs in isolated container
+- **Resource cleanup** - Complete cleanup prevents resource leaks
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This platform is designed to run directly on your server host system for maximum control and access to system resources.
