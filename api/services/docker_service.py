@@ -179,7 +179,17 @@ CMD ["nginx", "-g", "daemon off;"]
                     f.write(dockerfile_content)
                 await self.log_build(deployment.id, "Generated Dockerfile")
             
-            image_tag = f"{deployment.name}:{deployment.id}"
+            # Docker tags must be lowercase and alphanumeric with limited special chars
+            safe_name = deployment.name.lower().replace('_', '-').replace(' ', '-')
+            # Remove any characters that aren't alphanumeric, hyphens, or dots
+            safe_name = ''.join(c for c in safe_name if c.isalnum() or c in '-.')
+            # Ensure it starts with alphanumeric (remove leading hyphens/dots)
+            safe_name = safe_name.lstrip('-.')
+            # Fallback if name becomes empty
+            if not safe_name:
+                safe_name = "deployment"
+                
+            image_tag = f"{safe_name}:{deployment.id}"
             
             loop = asyncio.get_event_loop()
             image = await loop.run_in_executor(
