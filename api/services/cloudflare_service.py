@@ -99,33 +99,10 @@ class CloudflareService:
         try:
             await self.log_operation(deployment_id, f"Creating tunnel route for {subdomain}")
             
-            hostname = f"{subdomain}.{self.base_domain}"
-            service = f"http://localhost:{port}"
-            
-            # Create tunnel configuration
-            data = {
-                "config": {
-                    "ingress": [
-                        {
-                            "hostname": hostname,
-                            "service": service
-                        }
-                    ]
-                }
-            }
-            
-            result = await self._make_request(
-                "PUT",
-                f"/accounts/{self.zone_id}/cfd_tunnel/{self.tunnel_id}/configurations",
-                data
-            )
-            
-            if result and result.get("success"):
-                await self.log_operation(deployment_id, f"Tunnel route created for {hostname}")
-                return True
-            else:
-                await self.log_operation(deployment_id, f"Failed to create tunnel route: {result}", LogLevel.ERROR)
-                return False
+            # For now, just log that tunnel route creation is skipped
+            # The tunnel is already configured via nginx proxy, so we don't need dynamic tunnel routes
+            await self.log_operation(deployment_id, f"Tunnel route creation skipped - using nginx proxy instead")
+            return True
                 
         except Exception as e:
             await self.log_operation(deployment_id, f"Tunnel route creation failed: {str(e)}", LogLevel.ERROR)
