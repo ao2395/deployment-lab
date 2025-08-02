@@ -7,10 +7,10 @@ echo "Starting Deployment Lab..."
 # Create logs directory if it doesn't exist
 mkdir -p logs
 
-# Kill any existing processes
-pkill -f "next start"
-pkill -f uvicorn
-pkill -f cloudflared
+# Kill any existing processes (ignore errors if processes don't exist)
+pkill -f "next start" 2>/dev/null || true
+pkill -f uvicorn 2>/dev/null || true
+pkill -f cloudflared 2>/dev/null || true
 
 # Wait for processes to stop
 sleep 2
