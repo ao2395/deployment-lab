@@ -13,7 +13,7 @@ check_process() {
     if [ -f "$pidfile" ]; then
         local pid=$(cat "$pidfile")
         if kill -0 "$pid" 2>/dev/null; then
-            if [ -n "$port" ] && lsof -i ":$port" > /dev/null 2>&1; then
+            if [ -n "$port" ] && sudo netstat -tuln | grep -q ":$port"; then
                 echo "✅ $name (PID: $pid) - Running on port $port"
             elif [ -z "$port" ]; then
                 echo "✅ $name (PID: $pid) - Running"
@@ -40,8 +40,8 @@ check_process "Tunnel" "logs/tunnel.pid"
 echo ""
 echo "Port Status:"
 for port in 3000 8000; do
-    if lsof -i ":$port" > /dev/null 2>&1; then
-        process=$(lsof -i ":$port" | tail -n 1 | awk '{print $1 " (PID: " $2 ")"}')
+    if sudo netstat -tuln | grep -q ":$port"; then
+        process=$(sudo netstat -tuln | grep ":$port" | awk '{print "LISTEN"}')
         echo "Port $port: $process"
     else
         echo "Port $port: FREE"

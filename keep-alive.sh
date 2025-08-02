@@ -17,7 +17,7 @@ while true; do
     # Check backend
     if [ -f "logs/backend.pid" ]; then
         BACKEND_PID=$(cat logs/backend.pid)
-        if ! kill -0 "$BACKEND_PID" 2>/dev/null || ! lsof -i :8000 > /dev/null 2>&1; then
+        if ! kill -0 "$BACKEND_PID" 2>/dev/null || ! sudo netstat -tuln | grep -q :8000; then
             echo "$(date): ❌ Backend died, restarting..."
             cd api
             nohup poetry run uvicorn main:app --host 0.0.0.0 --port 8000 --reload > ../logs/backend.log 2>&1 &
@@ -37,7 +37,7 @@ while true; do
     # Check frontend
     if [ -f "logs/frontend.pid" ]; then
         FRONTEND_PID=$(cat logs/frontend.pid)
-        if ! kill -0 "$FRONTEND_PID" 2>/dev/null || ! lsof -i :3000 > /dev/null 2>&1; then
+        if ! kill -0 "$FRONTEND_PID" 2>/dev/null || ! sudo netstat -tuln | grep -q :3000; then
             echo "$(date): ❌ Frontend died, restarting..."
             nohup npx next start -H 0.0.0.0 -p 3000 > logs/frontend.log 2>&1 &
             echo $! > logs/frontend.pid

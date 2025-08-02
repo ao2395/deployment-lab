@@ -21,13 +21,13 @@ sudo fuser -k 3000/tcp 2>/dev/null || true
 sleep 3
 
 # Verify port 3000 is actually free
-if lsof -i :3000 > /dev/null 2>&1; then
+if sudo netstat -tuln | grep -q :3000; then
     echo "⚠️  Port 3000 still in use after cleanup. Trying harder..."
     sudo pkill -f next-server 2>/dev/null || true
     sudo fuser -k 3000/tcp 2>/dev/null || true
     sleep 2
     
-    if lsof -i :3000 > /dev/null 2>&1; then
+    if sudo netstat -tuln | grep -q :3000; then
         echo "❌ Could not free port 3000. Please check manually:"
         echo "   sudo lsof -i :3000"
         echo "   sudo fuser -k 3000/tcp"
@@ -93,7 +93,7 @@ sleep 2
 if kill -0 $FRONTEND_PID 2>/dev/null; then
     # Check if port is bound (may take a moment)
     for i in {1..10}; do
-        if lsof -i :3000 > /dev/null 2>&1; then
+        if sudo netstat -tuln | grep -q :3000; then
             echo "✅ Frontend: http://localhost:3000"
             FRONTEND_RUNNING=true
             break
@@ -109,7 +109,7 @@ else
     echo "❌ Frontend: Process died"
 fi
 
-if kill -0 $BACKEND_PID 2>/dev/null && lsof -i :8000 > /dev/null 2>&1; then
+if kill -0 $BACKEND_PID 2>/dev/null && sudo netstat -tuln | grep -q :8000; then
     echo "✅ Backend API: http://localhost:8000"
     BACKEND_RUNNING=true
 else

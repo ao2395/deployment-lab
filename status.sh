@@ -6,8 +6,8 @@ echo "=== DEPLOYMENT LAB STATUS ==="
 echo ""
 
 echo "📱 Main App Status:"
-echo "Frontend (port 3000): $(lsof -i :3000 | wc -l) processes"
-echo "Backend (port 8000): $(lsof -i :8000 | wc -l) processes"
+echo "Frontend (port 3000): $(sudo netstat -tuln | grep :3000 | wc -l) processes"
+echo "Backend (port 8000): $(sudo netstat -tuln | grep :8000 | wc -l) processes"
 echo ""
 
 echo "🌐 Nginx Status:"
@@ -42,11 +42,11 @@ done
 echo ""
 
 echo "📊 Port Usage:"
-echo "Port 3000: $(lsof -i :3000 | tail -n +2 | wc -l) processes"
-echo "Port 8000: $(lsof -i :8000 | tail -n +2 | wc -l) processes"
+echo "Port 3000: $(sudo netstat -tuln | grep :3000 | wc -l) processes"
+echo "Port 8000: $(sudo netstat -tuln | grep :8000 | wc -l) processes"
 echo "Ports 3001-3010:"
 for port in {3001..3010}; do
-    if lsof -i :$port > /dev/null 2>&1; then
+    if sudo netstat -tuln | grep -q :$port; then
         echo "  Port $port: IN USE"
     fi
 done
