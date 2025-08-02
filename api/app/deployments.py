@@ -47,6 +47,8 @@ async def deploy_application(deployment_id: str):
         if not deployment_doc:
             return
         
+        # Convert ObjectId to string for Pydantic compatibility
+        deployment_doc["_id"] = str(deployment_doc["_id"])
         deployment = DeploymentModel(**deployment_doc)
         
         # Initialize services with error logging
