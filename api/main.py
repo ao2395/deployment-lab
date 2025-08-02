@@ -1,9 +1,15 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import time
+import logging
 from models import connect_to_mongo, close_mongo_connection, create_indexes
 from app.auth import router as auth_router
 from app.deployments import router as deployments_router
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,6 +26,22 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    
+    # Log incoming request
+    logger.info(f"🔥 {request.method} {request.url} - Headers: {dict(request.headers)}")
+    
+    response = await call_next(request)
+    
+    # Log response
+    process_time = time.time() - start_time
+    logger.info(f"✅ {request.method} {request.url} - Status: {response.status_code} - Time: {process_time:.4f}s")
+    
+    return response
 
 # CORS middleware
 app.add_middleware(
