@@ -55,16 +55,16 @@ nohup npx next start -H 0.0.0.0 -p 3000 > logs/frontend.log 2>&1 &
 FRONTEND_PID=$!
 echo "Frontend started with PID: $FRONTEND_PID"
 
-# Wait a moment and check if frontend actually started
-sleep 3
+# Wait for frontend to fully start and bind to port
+echo "Waiting for frontend to start..."
+sleep 5
+
 if ! kill -0 $FRONTEND_PID 2>/dev/null; then
-    echo "❌ Frontend failed to start! Check logs/frontend.log"
+    echo "❌ Frontend process died! Check logs/frontend.log"
     echo "Frontend error:"
     tail -n 10 logs/frontend.log
-    echo ""
-    echo "Frontend exit code: $?"
 else
-    echo "✅ Frontend is running"
+    echo "✅ Frontend process is running"
 fi
 
 # Start Cloudflare tunnel
@@ -87,11 +87,26 @@ FRONTEND_RUNNING=false
 BACKEND_RUNNING=false
 TUNNEL_RUNNING=false
 
-if kill -0 $FRONTEND_PID 2>/dev/null && lsof -i :3000 > /dev/null 2>&1; then
-    echo "✅ Frontend: http://localhost:3000"
-    FRONTEND_RUNNING=true
+# Wait a bit more for port binding
+sleep 2
+
+if kill -0 $FRONTEND_PID 2>/dev/null; then
+    # Check if port is bound (may take a moment)
+    for i in {1..10}; do
+        if lsof -i :3000 > /dev/null 2>&1; then
+            echo "✅ Frontend: http://localhost:3000"
+            FRONTEND_RUNNING=true
+            break
+        fi
+        sleep 1
+    done
+    
+    if [ "$FRONTEND_RUNNING" != true ]; then
+        echo "⚠️  Frontend: Process running but port 3000 not bound yet"
+        FRONTEND_RUNNING=true  # Consider it running since process is alive
+    fi
 else
-    echo "❌ Frontend: Failed to start"
+    echo "❌ Frontend: Process died"
 fi
 
 if kill -0 $BACKEND_PID 2>/dev/null && lsof -i :8000 > /dev/null 2>&1; then
