@@ -43,7 +43,18 @@ class DockerService:
             return None
     
     def detect_project_type(self, repo_path: str) -> str:
-        if os.path.exists(os.path.join(repo_path, "package.json")):
+        # Check for Next.js + FastAPI combo first (most specific)
+        has_package_json = os.path.exists(os.path.join(repo_path, "package.json"))
+        has_api_dir = os.path.exists(os.path.join(repo_path, "api"))
+        has_fastapi = (
+            os.path.exists(os.path.join(repo_path, "api", "main.py")) or
+            os.path.exists(os.path.join(repo_path, "api", "pyproject.toml")) or
+            os.path.exists(os.path.join(repo_path, "api", "requirements.txt"))
+        )
+        
+        if has_package_json and has_api_dir and has_fastapi:
+            return "nextjs-fastapi"
+        elif has_package_json:
             return "node"
         elif os.path.exists(os.path.join(repo_path, "requirements.txt")) or os.path.exists(os.path.join(repo_path, "pyproject.toml")):
             return "python"
@@ -171,14 +182,6 @@ EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
             """
         }
-        
-        # Check if it's a Next.js + FastAPI project (both frontend and backend)
-        if project_type == "nextjs-fastapi" or (
-            os.path.exists(os.path.join(repo_path, "package.json")) and 
-            os.path.exists(os.path.join(repo_path, "api")) and
-            os.path.exists(os.path.join(repo_path, "api", "main.py"))
-        ):
-            return nextjs_fastapi_dockerfile.strip()
         
         return dockerfiles.get(project_type, dockerfiles["static"]).strip()
     

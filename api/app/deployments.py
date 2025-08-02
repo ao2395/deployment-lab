@@ -49,6 +49,16 @@ async def deploy_application(deployment_id: str):
         
         # Create a simple deployment object instead of using Pydantic model
         deployment_id_str = str(deployment_doc["_id"])
+        
+        # Debug: Log what's in the deployment document
+        from models import BuildLogModel, LogLevel
+        log_entry = BuildLogModel(
+            deployment_id=deployment_id_str,
+            message=f"Deployment document env_vars: {deployment_doc.get('env_vars', {})}",
+            log_level=LogLevel.INFO
+        )
+        await db.build_logs.insert_one(log_entry.dict(by_alias=True))
+        
         class SimpleDeployment:
             def __init__(self, doc):
                 self.id = deployment_id_str
