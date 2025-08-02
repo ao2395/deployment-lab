@@ -177,6 +177,9 @@ async def create_deployment(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user)
 ):
+    # Debug: Log what the API received
+    print(f"API received deployment_data: {deployment_data}")
+    print(f"API received env_vars: {deployment_data.env_vars}")
     db = get_database()
     port_service = PortService()
     

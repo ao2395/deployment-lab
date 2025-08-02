@@ -80,6 +80,8 @@ export default function DashboardPage() {
   })
 
   const handleCreateDeployment = (deployment: DeploymentCreate) => {
+    console.log('Frontend sending deployment:', deployment)
+    console.log('Frontend env_vars:', deployment.env_vars)
     createDeploymentMutation.mutate(deployment)
   }
 
