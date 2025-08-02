@@ -54,8 +54,20 @@ server {
             
             await self.log_operation(deployment_id, f"Creating nginx config for {subdomain}")
             
-            with open(config_file_path, 'w') as f:
-                f.write(config_content)
+            # Write config to temporary file first
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.conf') as temp_file:
+                temp_file.write(config_content)
+                temp_file_path = temp_file.name
+            
+            # Use sudo to move the file to the nginx directory
+            result = subprocess.run([
+                'sudo', 'mv', temp_file_path, config_file_path
+            ], capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                await self.log_operation(deployment_id, f"Failed to move config file: {result.stderr}", LogLevel.ERROR)
+                return False
             
             await self.log_operation(deployment_id, f"Nginx config created at {config_file_path}")
             return True
@@ -76,10 +88,16 @@ server {
             
             await self.log_operation(deployment_id, f"Enabling nginx site: {subdomain}")
             
-            if not os.path.exists(enabled_path):
-                os.symlink(available_path, enabled_path)
-                await self.log_operation(deployment_id, f"Site enabled: {subdomain}")
+            # Use sudo to create the symlink
+            result = subprocess.run([
+                'sudo', 'ln', '-sf', available_path, enabled_path
+            ], capture_output=True, text=True)
             
+            if result.returncode != 0:
+                await self.log_operation(deployment_id, f"Failed to enable site: {result.stderr}", LogLevel.ERROR)
+                return False
+                
+            await self.log_operation(deployment_id, f"Site enabled: {subdomain}")
             return True
             
         except Exception as e:
@@ -90,12 +108,12 @@ server {
         try:
             await self.log_operation(deployment_id, "Reloading nginx configuration")
             
-            result = subprocess.run(['nginx', '-t'], capture_output=True, text=True)
+            result = subprocess.run(['sudo', 'nginx', '-t'], capture_output=True, text=True)
             if result.returncode != 0:
                 await self.log_operation(deployment_id, f"Nginx config test failed: {result.stderr}", LogLevel.ERROR)
                 return False
             
-            result = subprocess.run(['systemctl', 'reload', 'nginx'], capture_output=True, text=True)
+            result = subprocess.run(['sudo', 'systemctl', 'reload', 'nginx'], capture_output=True, text=True)
             if result.returncode != 0:
                 await self.log_operation(deployment_id, f"Nginx reload failed: {result.stderr}", LogLevel.ERROR)
                 return False
