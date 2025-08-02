@@ -102,29 +102,32 @@ class CloudflareService:
             hostname = f"{subdomain}.{self.base_domain}"
             config_path = os.path.expanduser("~/.cloudflared/config.yml")
             
-            # Read current config
-            import yaml
+            # Read current config as text
             with open(config_path, 'r') as f:
-                config = yaml.safe_load(f)
+                lines = f.readlines()
             
             # Check if hostname already exists
-            ingress = config.get('ingress', [])
-            hostname_exists = any(
-                rule.get('hostname') == hostname 
-                for rule in ingress[:-1]  # Exclude the catch-all rule
-            )
+            hostname_exists = any(f"hostname: {hostname}" in line for line in lines)
             
             if not hostname_exists:
-                # Add new route before the catch-all (last rule)
-                new_route = {
-                    'hostname': hostname,
-                    'service': 'http://localhost:80'
-                }
-                ingress.insert(-1, new_route)  # Insert before catch-all
+                # Find the last service line (before catch-all)
+                insert_index = -1
+                for i, line in enumerate(lines):
+                    if 'service: http_status:404' in line:
+                        insert_index = i
+                        break
                 
-                # Write updated config
-                with open(config_path, 'w') as f:
-                    yaml.dump(config, f, default_flow_style=False)
+                if insert_index > 0:
+                    # Insert new route before catch-all
+                    new_lines = [
+                        f"  - hostname: {hostname}\n",
+                        f"    service: http://localhost:80\n"
+                    ]
+                    lines[insert_index:insert_index] = new_lines
+                    
+                    # Write updated config
+                    with open(config_path, 'w') as f:
+                        f.writelines(lines)
                 
                 await self.log_operation(deployment_id, f"Added tunnel route for {hostname}")
                 
@@ -195,25 +198,29 @@ class CloudflareService:
             hostname = f"{subdomain}.{self.base_domain}"
             config_path = os.path.expanduser("~/.cloudflared/config.yml")
             
-            # Read current config
-            import yaml
+            # Read current config as text
             with open(config_path, 'r') as f:
-                config = yaml.safe_load(f)
+                lines = f.readlines()
             
-            # Remove hostname from ingress rules
-            ingress = config.get('ingress', [])
-            original_length = len(ingress)
+            # Remove lines that contain this hostname
+            original_length = len(lines)
+            filtered_lines = []
+            skip_next = False
             
-            # Filter out the hostname (keep catch-all rule)
-            config['ingress'] = [
-                rule for rule in ingress
-                if rule.get('hostname') != hostname
-            ]
+            for line in lines:
+                if f"hostname: {hostname}" in line:
+                    skip_next = True  # Skip the service line too
+                    continue
+                elif skip_next and "service:" in line:
+                    skip_next = False
+                    continue
+                else:
+                    filtered_lines.append(line)
             
-            if len(config['ingress']) < original_length:
+            if len(filtered_lines) < original_length:
                 # Write updated config
                 with open(config_path, 'w') as f:
-                    yaml.dump(config, f, default_flow_style=False)
+                    f.writelines(filtered_lines)
                 
                 if deployment_id:
                     await self.log_operation(deployment_id, f"Removed tunnel route for {hostname}")
