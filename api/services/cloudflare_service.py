@@ -118,7 +118,7 @@ class CloudflareService:
                         break
                 
                 if insert_index > 0:
-                    # Insert new route before catch-all
+                    # Insert new route before catch-all with proper YAML formatting
                     new_lines = [
                         f"  - hostname: {hostname}\n",
                         f"    service: http://localhost:80\n"
@@ -131,14 +131,17 @@ class CloudflareService:
                 
                 await self.log_operation(deployment_id, f"Added tunnel route for {hostname}")
                 
-                # Restart tunnel to apply changes
+                # Send reload signal to tunnel (graceful reload without killing)
                 import subprocess
-                subprocess.run(['pkill', 'cloudflared'], check=False)
-                subprocess.Popen([
-                    'cloudflared', 'tunnel', '--config', config_path, 'run'
-                ], stdout=open('logs/tunnel.log', 'w'), stderr=subprocess.STDOUT)
-                
-                await self.log_operation(deployment_id, f"Tunnel restarted with new route for {hostname}")
+                try:
+                    # Send SIGHUP to reload config without restarting
+                    subprocess.run(['pkill', '-HUP', 'cloudflared'], check=True)
+                    await self.log_operation(deployment_id, f"Tunnel configuration reloaded for {hostname}")
+                except subprocess.CalledProcessError:
+                    # If no cloudflared process found, that's okay
+                    await self.log_operation(deployment_id, f"Tunnel route added (tunnel will pick up config on next start)")
+                except Exception as e:
+                    await self.log_operation(deployment_id, f"Warning: Could not reload tunnel config: {e}", LogLevel.WARNING)
             else:
                 await self.log_operation(deployment_id, f"Tunnel route already exists for {hostname}")
             
@@ -225,15 +228,16 @@ class CloudflareService:
                 if deployment_id:
                     await self.log_operation(deployment_id, f"Removed tunnel route for {hostname}")
                 
-                # Restart tunnel to apply changes
+                # Send reload signal to tunnel (graceful reload without killing)
                 import subprocess
-                subprocess.run(['pkill', 'cloudflared'], check=False)
-                subprocess.Popen([
-                    'cloudflared', 'tunnel', '--config', config_path, 'run'
-                ], stdout=open('logs/tunnel.log', 'w'), stderr=subprocess.STDOUT)
-                
-                if deployment_id:
-                    await self.log_operation(deployment_id, f"Tunnel restarted after removing route for {hostname}")
+                try:
+                    # Send SIGHUP to reload config without restarting
+                    subprocess.run(['pkill', '-HUP', 'cloudflared'], check=False)
+                    if deployment_id:
+                        await self.log_operation(deployment_id, f"Tunnel configuration reloaded after removing {hostname}")
+                except Exception as e:
+                    if deployment_id:
+                        await self.log_operation(deployment_id, f"Warning: Could not reload tunnel config: {e}", LogLevel.WARNING)
             else:
                 if deployment_id:
                     await self.log_operation(deployment_id, f"No tunnel route found for {hostname}")
