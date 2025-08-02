@@ -39,7 +39,7 @@ echo "✅ Port 3000 is free"
 # Start FastAPI backend
 echo "Starting FastAPI backend on port 8000..."
 cd api
-nohup poetry run uvicorn main:app --host 0.0.0.0 --port 8000 --reload --log-level info > ../logs/backend.log 2>&1 &
+nohup poetry run uvicorn main:app --host 0.0.0.0 --port 8000 --reload --log-level info --no-access-log > ../logs/backend.log 2>&1 &
 BACKEND_PID=$!
 echo "Backend started with PID: $BACKEND_PID"
 
