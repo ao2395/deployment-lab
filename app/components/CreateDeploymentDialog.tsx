@@ -31,13 +31,19 @@ export function CreateDeploymentDialog({
 
   const addEnvVar = () => {
     if (newEnvKey && newEnvValue) {
-      setFormData(prev => ({
-        ...prev,
-        env_vars: {
-          ...prev.env_vars,
-          [newEnvKey]: newEnvValue
+      console.log('Adding env var:', newEnvKey, '=', newEnvValue)
+      console.log('Current env_vars before:', formData.env_vars)
+      setFormData(prev => {
+        const newFormData = {
+          ...prev,
+          env_vars: {
+            ...prev.env_vars,
+            [newEnvKey]: newEnvValue
+          }
         }
-      }))
+        console.log('New env_vars after:', newFormData.env_vars)
+        return newFormData
+      })
       setNewEnvKey('')
       setNewEnvValue('')
     }
@@ -56,6 +62,8 @@ export function CreateDeploymentDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('Form submit - formData:', formData)
+    console.log('Form submit - env_vars:', formData.env_vars)
     onSubmit(formData)
   }
 
