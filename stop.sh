@@ -29,8 +29,14 @@ fi
 # Kill any remaining processes by name (ignore errors)
 echo "Cleaning up any remaining processes..."
 pkill -f "next start" 2>/dev/null || true
+pkill -f "next-server" 2>/dev/null || true
 pkill -f "uvicorn main:app" 2>/dev/null || true
 pkill -f "cloudflared tunnel" 2>/dev/null || true
+
+# Force kill anything on ports
+echo "Freeing ports..."
+sudo fuser -k 3000/tcp 2>/dev/null || true
+sudo fuser -k 8000/tcp 2>/dev/null || true
 
 # Wait for processes to stop
 sleep 2

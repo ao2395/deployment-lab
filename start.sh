@@ -9,8 +9,13 @@ mkdir -p logs
 
 # Kill any existing processes (ignore errors if processes don't exist)
 pkill -f "next start" 2>/dev/null || true
+pkill -f "next-server" 2>/dev/null || true
 pkill -f uvicorn 2>/dev/null || true
 pkill -f cloudflared 2>/dev/null || true
+
+# Force kill anything on port 3000
+echo "Freeing port 3000..."
+sudo fuser -k 3000/tcp 2>/dev/null || true
 
 # Wait for processes to stop
 sleep 2
