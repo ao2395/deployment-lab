@@ -42,7 +42,21 @@ async def deploy_application(deployment_id: str):
         
         deployment = DeploymentModel(**deployment_doc)
         
-        docker_service = DockerService()
+        # Initialize services with error logging
+        try:
+            docker_service = DockerService()
+            await docker_service.log_build(deployment_id, "Docker service initialized successfully")
+        except Exception as e:
+            # Log error directly to database since docker_service failed to initialize
+            from models import BuildLogModel, LogLevel
+            log_entry = BuildLogModel(
+                deployment_id=deployment_id,
+                message=f"Failed to initialize Docker service: {str(e)}",
+                log_level=LogLevel.ERROR
+            )
+            await db.build_logs.insert_one(log_entry.dict(by_alias=True))
+            raise
+            
         nginx_service = NginxService()
         cloudflare_service = CloudflareService()
         cleanup_service = CleanupService()
@@ -84,6 +98,28 @@ async def deploy_application(deployment_id: str):
             
     except Exception as e:
         print(f"Background deployment task failed: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Log error to database for user visibility
+        try:
+            db = get_database()
+            from models import BuildLogModel, LogLevel
+            log_entry = BuildLogModel(
+                deployment_id=deployment_id,
+                message=f"Background deployment task failed: {str(e)}",
+                log_level=LogLevel.ERROR
+            )
+            await db.build_logs.insert_one(log_entry.dict(by_alias=True))
+            
+            # Update deployment status to failed
+            await db.deployments.update_one(
+                {"_id": deployment_id},
+                {"$set": {"status": "failed"}}
+            )
+        except Exception as log_error:
+            print(f"Failed to log error to database: {log_error}")
+        
         cleanup_service = CleanupService()
         await cleanup_service.cleanup_failed_deployment(deployment_id)
 
