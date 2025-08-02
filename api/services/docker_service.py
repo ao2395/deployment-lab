@@ -21,9 +21,10 @@ class DockerService:
         await db.build_logs.insert_one(log_entry.dict(by_alias=True))
         
     async def update_deployment_status(self, deployment_id: str, status: DeploymentStatus):
+        from bson import ObjectId
         db = get_database()
         await db.deployments.update_one(
-            {"_id": deployment_id},
+            {"_id": ObjectId(deployment_id)},
             {"$set": {"status": status}}
         )
     
@@ -226,7 +227,7 @@ CMD ["nginx", "-g", "daemon off;"]
                 lambda: self.client.containers.run(
                     image_tag,
                     name=container_name,
-                    ports={f'{deployment.port}/tcp': deployment.port},
+                    ports={'3000/tcp': deployment.port},
                     environment=env_vars,
                     detach=True,
                     restart_policy={"Name": "unless-stopped"}
@@ -323,9 +324,10 @@ CMD ["nginx", "-g", "daemon off;"]
                 await self.update_deployment_status(deployment.id, DeploymentStatus.FAILED)
                 return False
             
+            from bson import ObjectId
             db = get_database()
             await db.deployments.update_one(
-                {"_id": deployment.id},
+                {"_id": ObjectId(deployment.id)},
                 {
                     "$set": {
                         "container_id": container_id,
