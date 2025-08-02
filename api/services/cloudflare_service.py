@@ -99,9 +99,46 @@ class CloudflareService:
         try:
             await self.log_operation(deployment_id, f"Creating tunnel route for {subdomain}")
             
-            # For now, just log that tunnel route creation is skipped
-            # The tunnel is already configured via nginx proxy, so we don't need dynamic tunnel routes
-            await self.log_operation(deployment_id, f"Tunnel route creation skipped - using nginx proxy instead")
+            hostname = f"{subdomain}.{self.base_domain}"
+            config_path = os.path.expanduser("~/.cloudflared/config.yml")
+            
+            # Read current config
+            import yaml
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f)
+            
+            # Check if hostname already exists
+            ingress = config.get('ingress', [])
+            hostname_exists = any(
+                rule.get('hostname') == hostname 
+                for rule in ingress[:-1]  # Exclude the catch-all rule
+            )
+            
+            if not hostname_exists:
+                # Add new route before the catch-all (last rule)
+                new_route = {
+                    'hostname': hostname,
+                    'service': 'http://localhost:80'
+                }
+                ingress.insert(-1, new_route)  # Insert before catch-all
+                
+                # Write updated config
+                with open(config_path, 'w') as f:
+                    yaml.dump(config, f, default_flow_style=False)
+                
+                await self.log_operation(deployment_id, f"Added tunnel route for {hostname}")
+                
+                # Restart tunnel to apply changes
+                import subprocess
+                subprocess.run(['pkill', 'cloudflared'], check=False)
+                subprocess.Popen([
+                    'cloudflared', 'tunnel', '--config', config_path, 'run'
+                ], stdout=open('logs/tunnel.log', 'w'), stderr=subprocess.STDOUT)
+                
+                await self.log_operation(deployment_id, f"Tunnel restarted with new route for {hostname}")
+            else:
+                await self.log_operation(deployment_id, f"Tunnel route already exists for {hostname}")
+            
             return True
                 
         except Exception as e:
@@ -155,46 +192,46 @@ class CloudflareService:
             if deployment_id:
                 await self.log_operation(deployment_id, f"Removing tunnel route for {subdomain}")
             
-            # Get current tunnel configuration
-            current_config = await self._make_request(
-                "GET",
-                f"/accounts/{self.zone_id}/cfd_tunnel/{self.tunnel_id}/configurations"
-            )
-            
-            if not current_config or not current_config.get("result"):
-                if deployment_id:
-                    await self.log_operation(deployment_id, "No tunnel configuration found")
-                return True
-            
             hostname = f"{subdomain}.{self.base_domain}"
-            config = current_config["result"].get("config", {})
-            ingress = config.get("ingress", [])
+            config_path = os.path.expanduser("~/.cloudflared/config.yml")
             
-            # Remove the specific hostname from ingress rules
-            updated_ingress = [rule for rule in ingress if rule.get("hostname") != hostname]
+            # Read current config
+            import yaml
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f)
             
-            # Update tunnel configuration
-            data = {
-                "config": {
-                    "ingress": updated_ingress
-                }
-            }
+            # Remove hostname from ingress rules
+            ingress = config.get('ingress', [])
+            original_length = len(ingress)
             
-            result = await self._make_request(
-                "PUT",
-                f"/accounts/{self.zone_id}/cfd_tunnel/{self.tunnel_id}/configurations",
-                data
-            )
+            # Filter out the hostname (keep catch-all rule)
+            config['ingress'] = [
+                rule for rule in ingress
+                if rule.get('hostname') != hostname
+            ]
             
-            if result and result.get("success"):
+            if len(config['ingress']) < original_length:
+                # Write updated config
+                with open(config_path, 'w') as f:
+                    yaml.dump(config, f, default_flow_style=False)
+                
                 if deployment_id:
-                    await self.log_operation(deployment_id, f"Tunnel route removed for {hostname}")
-                return True
+                    await self.log_operation(deployment_id, f"Removed tunnel route for {hostname}")
+                
+                # Restart tunnel to apply changes
+                import subprocess
+                subprocess.run(['pkill', 'cloudflared'], check=False)
+                subprocess.Popen([
+                    'cloudflared', 'tunnel', '--config', config_path, 'run'
+                ], stdout=open('logs/tunnel.log', 'w'), stderr=subprocess.STDOUT)
+                
+                if deployment_id:
+                    await self.log_operation(deployment_id, f"Tunnel restarted after removing route for {hostname}")
             else:
                 if deployment_id:
-                    await self.log_operation(deployment_id, f"Failed to remove tunnel route: {result}", LogLevel.ERROR)
-                return False
-                
+                    await self.log_operation(deployment_id, f"No tunnel route found for {hostname}")
+            
+            return True
         except Exception as e:
             if deployment_id:
                 await self.log_operation(deployment_id, f"Tunnel route removal failed: {str(e)}", LogLevel.ERROR)
