@@ -34,7 +34,7 @@ class NginxService:
             mapping_content += "# Do not edit manually\n\n"
             
             for deployment in deployments:
-                mapping_content += f"{deployment['subdomain']}.{self.base_domain} localhost:{deployment['port']};\n"
+                mapping_content += f"{deployment['subdomain']}.{self.base_domain} http://127.0.0.1:{deployment['port']};\n"
             
             # Write to temporary file first
             import tempfile
@@ -64,7 +64,7 @@ class NginxService:
 # Load the mapping
 map $host $backend {{
     include {self.mapping_file};
-    default http://localhost:404;
+    default http://127.0.0.1:404;
 }}
 
 server {{
@@ -161,7 +161,7 @@ server {{
             if not success:
                 return False
             
-            await self.log_operation(deployment_id, f"Added {subdomain}.{self.base_domain} -> localhost:{port}")
+            await self.log_operation(deployment_id, f"Added {subdomain}.{self.base_domain} -> 127.0.0.1:{port}")
             return True
             
         except Exception as e:
@@ -213,7 +213,7 @@ server {{
                 mapping_content += "# Do not edit manually\n\n"
                 
                 for deployment in deployments:
-                    mapping_content += f"{deployment['subdomain']}.{self.base_domain} localhost:{deployment['port']};\n"
+                    mapping_content += f"{deployment['subdomain']}.{self.base_domain} http://127.0.0.1:{deployment['port']};\n"
                 
                 # Write mapping file
                 with open(self.mapping_file, 'w') as f:
