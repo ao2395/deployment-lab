@@ -82,6 +82,12 @@ RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 COPY --from=frontend-deps /app/node_modules ./node_modules
 COPY . .
+
+# Create next.config.js with standalone mode if it doesn't exist
+RUN if [ ! -f next.config.js ] && [ ! -f next.config.ts ]; then \\
+    echo 'module.exports = {{ output: "standalone", trailingSlash: false, telemetry: false }}' > next.config.js; \\
+    fi
+
 RUN npm run build
 
 # Stage 2: Python backend setup
@@ -93,22 +99,13 @@ RUN poetry config virtualenvs.create false && \\
     poetry install --no-interaction --no-ansi
 
 # Stage 3: Final runtime image
-FROM python:3.11-slim AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Install Node.js for Next.js
-RUN apt-get update && apt-get install -y \\
-    curl \\
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \\
-    && apt-get install -y nodejs \\
-    && apt-get clean \\
-    && rm -rf /var/lib/apt/lists/*
+# Install Python for FastAPI backend
+RUN apk add --no-cache python3 py3-pip
 
-# Copy Python dependencies
-COPY --from=backend-base /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=backend-base /usr/local/bin /usr/local/bin
-
-# Copy Next.js build
+# Copy Next.js standalone build
 COPY --from=frontend-builder /app/.next/standalone ./
 COPY --from=frontend-builder /app/.next/static ./.next/static
 COPY --from=frontend-builder /app/public ./public
@@ -116,10 +113,14 @@ COPY --from=frontend-builder /app/public ./public
 # Copy FastAPI backend
 COPY api ./api
 
+# Copy Python dependencies
+COPY --from=backend-base /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=backend-base /usr/local/bin /usr/local/bin
+
 # Create startup script
-RUN echo '#!/bin/bash\\n\\
-# Start FastAPI backend in background (localhost only for internal access)\\n\\
-cd /app/api && uvicorn main:app --host 127.0.0.1 --port 8000 &\\n\\
+RUN echo '#!/bin/sh\\n\\
+# Start FastAPI backend in background\\n\\
+cd /app/api && python3 -m uvicorn main:app --host 127.0.0.1 --port 8000 &\\n\\
 \\n\\
 # Start Next.js frontend\\n\\
 cd /app && node server.js' > /app/start.sh && \\
@@ -128,20 +129,18 @@ cd /app && node server.js' > /app/start.sh && \\
 # Set environment variables
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
+ENV PORT={port}
 ENV HOSTNAME="0.0.0.0"
 
 # Expose port
-EXPOSE 3000
+EXPOSE {port}
 
 # Start both services
 CMD ["/app/start.sh"]
         """
         
-        # Fallback dockerfiles for other project types
-        dockerfiles = {
-            "nextjs-fastapi": nextjs_fastapi_dockerfile,
-            "node": f"""
+        # Improved Next.js Dockerfile
+        nextjs_dockerfile = f"""
 FROM node:20-alpine AS base
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
@@ -152,6 +151,12 @@ RUN npm ci
 
 # Build the application
 COPY . .
+
+# Create next.config.js with standalone mode if it doesn't exist
+RUN if [ ! -f next.config.js ] && [ ! -f next.config.ts ]; then \\
+    echo 'module.exports = {{ output: "standalone", trailingSlash: false, telemetry: false }}' > next.config.js; \\
+    fi
+
 RUN npm run build
 
 # Set environment variables
@@ -165,7 +170,13 @@ EXPOSE {port}
 
 # Start the application
 CMD ["npm", "start"]
-            """,
+        """
+        
+        # Fallback dockerfiles for other project types
+        dockerfiles = {
+            "nextjs-fastapi": nextjs_fastapi_dockerfile,
+            "nextjs": nextjs_dockerfile,
+            "node": nextjs_dockerfile,
             "python": f"""
 FROM python:3.11-slim
 WORKDIR /app

@@ -20,13 +20,14 @@ class NginxService:
         await db.build_logs.insert_one(log_entry.dict(by_alias=True))
     
     def generate_nginx_config(self, subdomain: str, port: int) -> str:
-        template = Template("""
-server {
+        """Generate nginx configuration for a deployment"""
+        config = f"""server {{
     listen 80;
-    server_name {{ subdomain }}.{{ base_domain }};
+    server_name {subdomain}.{self.base_domain};
 
-    location / {
-        proxy_pass http://localhost:{{ port }};
+    # Handle Next.js static files with proper caching
+    location /_next/static/ {{
+        proxy_pass http://localhost:{port};
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -36,15 +37,33 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_cache_bypass $http_upgrade;
         proxy_read_timeout 86400;
-    }
-}
-        """.strip())
+        proxy_buffering off;
+        proxy_connect_timeout 60;
+        proxy_send_timeout 60;
         
-        return template.render(
-            subdomain=subdomain,
-            base_domain=self.base_domain,
-            port=port
-        )
+        # Cache static files
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }}
+
+    # Handle all other requests
+    location / {{
+        proxy_pass http://localhost:{port};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 86400;
+        proxy_buffering off;
+        proxy_connect_timeout 60;
+        proxy_send_timeout 60;
+    }}
+}}"""
+        return config
     
     async def create_config(self, subdomain: str, port: int, deployment_id: str) -> bool:
         try:
